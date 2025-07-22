@@ -3,10 +3,18 @@ import tempfile
 import os
 import whisper
 import openai
-from googletrans import Translator
 from pydub import AudioSegment
 import subprocess
 import re
+import requests
+
+# Try to import googletrans, fallback if not available
+try:
+    from googletrans import Translator
+    GOOGLETRANS_AVAILABLE = True
+except ImportError:
+    GOOGLETRANS_AVAILABLE = False
+    st.warning("Google Translate library not available. Using fallback translator.")
 
 # Set page configuration
 st.set_page_config(
@@ -97,33 +105,62 @@ def install_ffmpeg_instructions():
     # Download from https://ffmpeg.org/download.html
     """)
 
+def translate_with_fallback(text, target_lang):
+    """Fallback translation using basic word replacement"""
+    # Basic word mappings for common languages
+    basic_translations = {
+        "uk": {
+            "meeting": "зустріч", "question": "питання", "decision": "рішення",
+            "important": "важливо", "discussion": "обговорення", "problem": "проблема",
+            "solution": "рішення", "task": "завдання", "goal": "мета"
+        },
+        "ru": {
+            "meeting": "встреча", "question": "вопрос", "decision": "решение",
+            "important": "важно", "discussion": "обсуждение", "problem": "проблема",
+            "solution": "решение", "task": "задача", "goal": "цель"
+        }
+    }
+    
+    if target_lang in basic_translations:
+        translated_text = text
+        for en_word, translated_word in basic_translations[target_lang].items():
+            translated_text = translated_text.replace(en_word, translated_word)
+        return translated_text
+    
+    return text  # Return original if no translation available
+
 def translate_with_google(text, target_lang):
-    """Fast and reliable Google Translate"""
+    """Fast and reliable Google Translate with fallback"""
     try:
-        translator = Translator()
-        
-        # For long texts, split into smaller chunks
-        if len(text) > 3000:
-            chunks = [text[i:i+3000] for i in range(0, len(text), 3000)]
-            translated_chunks = []
+        if GOOGLETRANS_AVAILABLE:
+            translator = Translator()
             
-            progress_bar = st.progress(0)
-            for i, chunk in enumerate(chunks):
-                if chunk.strip():
-                    translation = translator.translate(chunk, dest=target_lang)
-                    translated_chunks.append(translation.text)
-                    progress_bar.progress((i + 1) / len(chunks))
-            progress_bar.empty()
-            
-            return " ".join(translated_chunks)
+            # For long texts, split into smaller chunks
+            if len(text) > 3000:
+                chunks = [text[i:i+3000] for i in range(0, len(text), 3000)]
+                translated_chunks = []
+                
+                progress_bar = st.progress(0)
+                for i, chunk in enumerate(chunks):
+                    if chunk.strip():
+                        translation = translator.translate(chunk, dest=target_lang)
+                        translated_chunks.append(translation.text)
+                        progress_bar.progress((i + 1) / len(chunks))
+                progress_bar.empty()
+                
+                return " ".join(translated_chunks)
+            else:
+                # Short text - translate directly
+                translation = translator.translate(text, dest=target_lang)
+                return translation.text
         else:
-            # Short text - translate directly
-            translation = translator.translate(text, dest=target_lang)
-            return translation.text
+            # Use fallback translation
+            st.info("Using basic translation due to library limitations")
+            return translate_with_fallback(text, target_lang)
             
     except Exception as e:
-        st.error(f"Google Translate error: {str(e)}")
-        return text
+        st.warning(f"Google Translate unavailable, using fallback: {str(e)}")
+        return translate_with_fallback(text, target_lang)
 
 def generate_smart_summary(text, target_lang):
     """Generate intelligent structured summary with analysis"""
@@ -245,10 +282,13 @@ def generate_smart_summary(text, target_lang):
                 # Translate if needed
                 if target_lang not in ["en"] and target_lang in templates:
                     try:
-                        translator = Translator()
-                        question = translator.translate(question, dest=target_lang).text
+                        if GOOGLETRANS_AVAILABLE:
+                            translator = Translator()
+                            question = translator.translate(question, dest=target_lang).text
+                        else:
+                            question = translate_with_fallback(question, target_lang)
                     except:
-                        pass
+                        question = translate_with_fallback(question, target_lang)
                 summary_parts.append(f"{i}. {question}")
             summary_parts.append("")
         
@@ -259,10 +299,13 @@ def generate_smart_summary(text, target_lang):
                 # Translate if needed
                 if target_lang not in ["en"] and target_lang in templates:
                     try:
-                        translator = Translator()
-                        point = translator.translate(point, dest=target_lang).text
+                        if GOOGLETRANS_AVAILABLE:
+                            translator = Translator()
+                            point = translator.translate(point, dest=target_lang).text
+                        else:
+                            point = translate_with_fallback(point, target_lang)
                     except:
-                        pass
+                        point = translate_with_fallback(point, target_lang)
                 summary_parts.append(f"• {point}")
             summary_parts.append("")
         
@@ -273,10 +316,13 @@ def generate_smart_summary(text, target_lang):
                 # Translate if needed
                 if target_lang not in ["en"] and target_lang in templates:
                     try:
-                        translator = Translator()
-                        decision = translator.translate(decision, dest=target_lang).text
+                        if GOOGLETRANS_AVAILABLE:
+                            translator = Translator()
+                            decision = translator.translate(decision, dest=target_lang).text
+                        else:
+                            decision = translate_with_fallback(decision, target_lang)
                     except:
-                        pass
+                        decision = translate_with_fallback(decision, target_lang)
                 summary_parts.append(f"{i}. {decision}")
             summary_parts.append("")
         
@@ -299,10 +345,13 @@ def generate_smart_summary(text, target_lang):
             for point in basic_points:
                 if target_lang not in ["en"] and target_lang in templates:
                     try:
-                        translator = Translator()
-                        point = translator.translate(point, dest=target_lang).text
+                        if GOOGLETRANS_AVAILABLE:
+                            translator = Translator()
+                            point = translator.translate(point, dest=target_lang).text
+                        else:
+                            point = translate_with_fallback(point, target_lang)
                     except:
-                        pass
+                        point = translate_with_fallback(point, target_lang)
                 summary_parts.append(f"• {point}")
             
             formatted_summary = "\n".join(summary_parts)
