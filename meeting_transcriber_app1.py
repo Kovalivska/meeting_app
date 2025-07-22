@@ -15,9 +15,6 @@ try:
 except ImportError:
     GOOGLETRANS_AVAILABLE = False
     st.warning("Google Translate library not available. Using fallback translator.")
-from googletrans import Translator
-
-
 
 # Set page configuration
 st.set_page_config(
@@ -135,26 +132,31 @@ def translate_with_fallback(text, target_lang):
 def translate_with_google(text, target_lang):
     """Fast and reliable Google Translate with fallback"""
     try:
-        translator = Translator()
-        
-        # For long texts, split into smaller chunks
-        if len(text) > 3000:
-            chunks = [text[i:i+3000] for i in range(0, len(text), 3000)]
-            translated_chunks = []
+        if GOOGLETRANS_AVAILABLE:
+            translator = Translator()
             
-            progress_bar = st.progress(0)
-            for i, chunk in enumerate(chunks):
-                if chunk.strip():
-                    translation = translator.translate(chunk, dest=target_lang)
-                    translated_chunks.append(translation.text)
-                    progress_bar.progress((i + 1) / len(chunks))
-            progress_bar.empty()
-            
-            return " ".join(translated_chunks)
+            # For long texts, split into smaller chunks
+            if len(text) > 3000:
+                chunks = [text[i:i+3000] for i in range(0, len(text), 3000)]
+                translated_chunks = []
+                
+                progress_bar = st.progress(0)
+                for i, chunk in enumerate(chunks):
+                    if chunk.strip():
+                        translation = translator.translate(chunk, dest=target_lang)
+                        translated_chunks.append(translation.text)
+                        progress_bar.progress((i + 1) / len(chunks))
+                progress_bar.empty()
+                
+                return " ".join(translated_chunks)
+            else:
+                # Short text - translate directly
+                translation = translator.translate(text, dest=target_lang)
+                return translation.text
         else:
-            # Short text - translate directly
-            translation = translator.translate(text, dest=target_lang)
-            return translation.text
+            # Use fallback translation
+            st.info("Using basic translation due to library limitations")
+            return translate_with_fallback(text, target_lang)
             
     except Exception as e:
         st.warning(f"Google Translate unavailable, using fallback: {str(e)}")
