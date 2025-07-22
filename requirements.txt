@@ -1,0 +1,9 @@
+streamlit>=1.28.0
+openai-whisper>=20231117
+openai>=0.28.0
+googletrans==4.0.0rc1
+torch>=2.0.0
+torchaudio>=2.0.0
+pydub>=0.25.1
+ffmpeg-python>=0.2.0
+requests>=2.25.0
